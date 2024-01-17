@@ -1,0 +1,123 @@
+---
+title: "Adv Predictive Models: Homework 1"
+output: html_document
+date: '2023-01-20'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#Relevant Libraries
+library(ggplot2)
+library(mvtnorm)
+library(ggplot2)
+library(gridExtra)
+library(tidyverse)
+```
+
+### Part C
+
+```{r fig.width = 6, fig.height = 4,fig.align = 'center'}
+#Set length and number of the time series
+n <- 120
+num_series <- 1
+
+#Set values for the parameters
+mu <- 0
+sigma2_1var <- 1
+wt_1var <- rnorm(n+1, mean=mu, sd=sqrt(1)) 
+t <- 0:n+1
+#n+1 since you're starting at 0
+#sqrt of var = sd
+
+#Set electrical signal process equation
+xt_1var <- 10 * sin(t/5.0) + wt_1var
+
+#Create data frame with simulated signal process equation
+sim_data_1var <- data.frame("Time"=0:n, "x"=xt_1var)
+
+#Create time series 
+timeseries_1var <- ggplot(sim_data_1var,aes(x = Time, y = x)) + 
+  geom_line(size=1, color="darkseagreen3") +
+  geom_point(size=2, color="darkolivegreen", fill="darkolivegreen") +
+  labs(title = "Time Series: 10sin(t/5) + w\nVariance = 1") + 
+  theme_light() + 
+  theme(plot.title = element_text(hjust=0.5), axis.title = element_text(face="bold"))
+
+#Display time series
+timeseries_1var
+```
+
+### Part D
+
+You can also embed plots, for example:
+
+```{r fig.width = 12, fig.height = 4, fig.align = 'center'}
+#Set length and number of the time series
+n <- 120
+num_series <- 1
+
+#Set values for the parameters
+mu <- 0
+sigma2_16var <- 16
+wt_16var <- rnorm(n+1, mean=mu, sd=sqrt(sigma2_16var)) 
+t <- 0:n+1
+#n+1 since you're starting at 0
+#sqrt of var = sd
+
+#Set electrical signal process equation
+xt_16var <- 10*sin(t/5) + wt_16var
+
+#Create data frame with simulated signal process equation
+sim_data_16var <- data.frame("Time"=0:n, "x"=xt_16var)
+sim_data_16var$x[6]
+
+#Create time series 
+timeseries_16var <- ggplot(sim_data_16var,aes(x = Time, y = x)) + 
+  geom_line(size=1, color="darkseagreen3") +
+  geom_point(size=2, color="darkolivegreen", fill="darkolivegreen") +
+  labs(title = "Time Series: 10sin(t/5) + w\nVariance = 16") + 
+  ylim(-15,15) +
+  theme_light() + 
+  theme(plot.title = element_text(hjust=0.5), axis.title = element_text(face="bold"))
+
+#Display time series
+grid.arrange(timeseries_1var + ylim(-15,15) + labs(title = "Variance = 1"), 
+             timeseries_16var + labs(title = "Variance = 16"), 
+             nrow =1,
+             top ="Comparing Time Series: 10 sin(t/5) + w")
+```
+
+### Part E
+
+```{r fig.width = 12, fig.height = 4, fig.align = 'center'}
+#Display time series
+grid.arrange(timeseries_1var + ylim(-15,15) + 
+               labs(title = "Variance = 1") +
+               geom_vline(xintercept=45, color="coral3", size=0.8) +
+               geom_point( 
+                 data = sim_data_1var,
+                 aes(45,sim_data_1var$x[46]),
+                 color='coral3',
+                 size = 5,
+                 alpha = 1,
+                 shape = 21,
+                 stroke =2), 
+             timeseries_16var + 
+               labs(title = "Variance = 16") + 
+               geom_vline(xintercept=45, color="coral3", size=0.8) +
+               geom_point( 
+                 data = sim_data_16var,
+                 aes(45,sim_data_16var$x[46]),
+                 color='coral3',
+                 size = 5,
+                 alpha = 1,
+                 shape = 21,
+                 stroke =2), 
+             nrow =1,
+             top ="Comparing Time Series: 10 sin(t/5) + w")
+
+#Observed value of x at t=45 for variance=1
+sim_data_1var$x[46]
+#Observed value of x at t=45 for variance=16
+sim_data_16var$x[46]
+```

@@ -1,0 +1,166 @@
+---
+title: "HW3 Question 1"
+output: html_document
+date: '2023-02-10'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Setup
+rm(list=ls())
+library(ggplot2)
+library(gridExtra)
+library(tidyverse)
+library(xts)
+library(depmixS4)
+library(dlm)
+library(gamlss.data)
+
+# DF setup with polio counts in one column
+df <- data.frame(polio, date=paste(month.abb[cycle(polio)], sep=" ", trunc(time(polio))))
+```
+
+### Part A
+
+The model is below. The AIC is 530.0655. The $\lambda$~1~=0.7902 and the $\lambda$~2~=4.1779.The probabilities of the state transitional matrix are as follows:
+
+* State 1 to State 1: 93.2%
+
+* State 1 to State 2:  6.8%
+
+* State 2 to State 1:  3.3%
+
+* State 2 to State 2: 67.0%
+
+
+```{r, fig.align = 'center'}
+# Create the non-stationary HMM 
+eq_mod <- depmix(polio ~ 1, # this is the intercept for poisson paramater
+                 data = df,
+                 family = poisson(),
+                 nstates = 2, # 2 state HMM
+                 ntimes = nrow(df))
+
+
+# Fit the model using an EM algorithm
+set.seed(900)
+eq_fit <- fit(eq_mod)
+summary(eq_fit) #lambda for each hidden state are the st1 and st2 response params
+eq_fit
+
+# Get estimate of lambda
+getpars(eq_fit)
+
+# Exponentiate to get back on the poisson scale
+exp(getpars(eq_fit)[7:8])
+
+# Get the posterior distribution of the states from best guess of latent states at each time points
+df$states <- as.factor(posterior(eq_fit, type = "viterbi")$state)
+
+# Adding a time column to df so it plots in order vs alphabetical
+time = 1:nrow(df)
+df$time = time
+# Adding more readable date labels for x axis
+jan_months <- c()
+jan_labels <- c()
+for (n in 0:13){
+  jan_months <- append(jan_months, 12*n+1)
+  jan_labels <- append(jan_labels, paste("Jan", 1970+n))
+}
+
+# Plotting the time series
+ggplot(df, aes(x = time, y = polio)) +
+  geom_point(size = 1, color = "seagreen") +
+  geom_text(aes(label = states, color = states), nudge_y = 0.7) +
+  geom_line(color = "darkseagreen3") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust=0.5), axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
+  scale_x_continuous(breaks = jan_months, labels = jan_labels) +
+  labs(title = '2 State Model:\n Polio Counts from 1970 to 1983') + 
+  scale_colour_brewer(palette = "Set1")
+```
+
+### Part B
+
+For data points most likely under State 1, specifically when $\lambda$~1~=0.7902, the number of polio cases is lower (closer to 0.7902) with less variability from this point (variance=0.7902). For data points most likely under State 2, specifically when $\lambda$~2~=4.1779, the number of polio cases is higher (closer to 4.1779) with more variability from this point (variance=4.1779).
+
+If we look at points with 4+ polio counts, we are more likely to observe exactly 0 cases (38.46% chance) following this as opposed to 2+ (23.08% chance). This is not consistent with basic knowledge about infectious disease, given that following high polio counts, it is most likely that polio counts would remain high or slowly drop off as opposed to immediately going to 0. 
+
+```{r}
+# Subsetting the polio data frame for at least 4 cases, store the time t polio counts
+highpolio <- df[df$polio > '3', ]
+# Creating an empty vector to store the time t+1 polio counts
+after_highpolio <- c()
+# Append t+1 polio counts
+for (n in highpolio$time){
+  after_highpolio <- append(after_highpolio, df$polio[df$time==(n+1)])
+}
+# Percentage of more than 2 polio counts after at least 4 polio
+length(after_highpolio[after_highpolio>2])/length(after_highpolio)
+# Percentage of 0 polio counts after at least 4 polio
+length(after_highpolio[after_highpolio==0])/length(after_highpolio)
+```
+
+### Part C
+
+The model is below. The AIC is 529.9555. The $\lambda$~1~=2.2980, the $\lambda$~2~=0.6487, and $\lambda$~3~=8.2571.The probabilities of the state transitional matrix are as follows:
+
+* State 1 to State 1: 69.6%
+
+* State 1 to State 2: 21.3%
+
+* State 1 to State 3:  9.1%
+
+* State 2 to State 1:  9.3%
+
+* State 2 to State 2: 90.7%
+
+* State 2 to State 3:  0.0%
+
+* State 3 to State 1: 61.4%
+
+* State 3 to State 2: 10.6%
+
+* State 3 to State 3: 28.0%
+
+```{r, fig.align = 'center'}
+# New dataframe without previous states
+df <- data.frame(polio, date=paste(month.abb[cycle(polio)], sep=" ", trunc(time(polio))))
+
+# Create the non-stationary HMM 
+eq_mod <- depmix(polio ~ 1, # this is the intercept for poisson paramater
+                 data = df,
+                 family = poisson(),
+                 nstates = 3, # 3 state HMM
+                 ntimes = nrow(df))
+
+
+# Fit the model using an EM algorithm
+set.seed(900)
+eq_fit <- fit(eq_mod)
+summary(eq_fit) #lambda for each hidden state are the st1 and st2 response params
+eq_fit
+
+# Get estimate of lambda
+getpars(eq_fit)
+
+# Exponentiate to get back on the poisson scale
+exp(getpars(eq_fit)[13:15])
+
+# Get the posterior distribution of the states from best guess of latent states at each time points
+df$states <- as.factor(posterior(eq_fit, type = "viterbi")$state)
+
+# Adding a time column to df so it plots in order vs alphabetical
+df$time = time
+
+# Plotting the time series
+ggplot(df, aes(x = time, y = polio)) +
+  geom_point(size = 1, color = "seagreen") +
+  geom_text(aes(label = states, color = states), nudge_y = 0.7) +
+  geom_line(color = "darkseagreen3") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust=0.5), axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none") +
+  scale_x_continuous(breaks = jan_months, labels = jan_labels) +
+  labs(title = '3 State Model:\n Polio Counts from 1970 to 1983') + 
+  scale_colour_brewer(palette = "Set1")
+```

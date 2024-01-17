@@ -1,0 +1,313 @@
+---
+title: "HW3 Question 2"
+output: html_document
+date: '2023-02-12'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load libraries
+rm(list=ls())
+library(ggplot2)
+library(gridExtra)
+library(tidyverse)
+library(readxl)
+library(xts)
+library(dlm)
+```
+
+```{r}
+# Load data and reformat
+dlmdata <- read_excel("~/MSDS/predictive models/DLM_Data.xlsx")
+dlmdata_missing <- dlmdata[dlmdata$yt == "NA", ] #removing NA values
+dlmdata <- dlmdata[dlmdata$yt != "NA", ] #removing NA values
+dlmdata$yt <- as.integer(dlmdata$yt) #changing yt from chr to int
+
+# Create plot with given y values
+gg_sim <- ggplot(dlmdata, aes(x = time, y = yt)) +
+  geom_point(size = 1, color = "seagreen") +
+  geom_line(color = "darkseagreen3") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust=0.5)) +
+  labs(title = 'DLM Data Time Series') 
+```
+
+### Part A
+
+The plot is below. The numerical values are as follows: a~40~=3.1155 and R~40~=5.9510.
+
+```{r, fig.align = 'center'}
+# Simulate both observed and unobserved from univariate DLM 
+# Set true values of unknown parameters
+sigma2v_tr <- 9 
+sigma2w_tr <- 4
+m0_tr <- 0 # Mean of theta
+C0_tr <- 25 # Var of theta
+
+# Construct a dlm model object with parameters fixed at their true values
+dlm_mod <- dlm(FF = 1.2,
+               GG = 0.8,
+               V = sigma2v_tr,
+               W = sigma2w_tr,
+               m0 = m0_tr,
+               C0 = C0_tr)   
+
+# Filter the simulated data y using the dlm
+dlmdata_filtered <- dlmFilter(y = dlmdata$yt,
+                               mod = dlm_mod)
+
+# Store and plot the one-step-ahead predictions of theta and standard errors
+dlmdata$pred <- dlmdata_filtered$a
+dlmdata$pSE <- sqrt(unlist(
+  dlmSvd2var(dlmdata_filtered$U.R, 
+             dlmdata_filtered$D.R)))
+
+# Adding one step ahead predictions of theta[t] w/ std errors (in red)
+gg_sim +
+  geom_line(data = dlmdata, 
+            aes(y = pred,
+                x = time),
+            color = "red",
+            size = 1.2) +
+  geom_ribbon(data = dlmdata,
+              aes(x = time, 
+                  ymin = pred - 1.96 * pSE,
+                  ymax = pred + 1.96 * pSE),
+              fill = "red",
+              alpha = 0.2) +
+  labs(title = expression(
+    paste("One-Step-Ahead Predictions of ",
+          theta[t],
+          " w/ Standard Errors"))) +
+  ylab("theta[t]")
+
+# Predicted mean and variance of theta at time=40
+dlmdata$pred[dlmdata$time == 40] # Mean aka at
+dlmdata$pSE[dlmdata$time == 40]**2 # Variance aka Rt
+
+```
+
+### Part B
+
+The plot is below. The numerical values are as follows: f~40~=3.7386 and Q~40~=17.5694.
+
+```{r, fig.align = 'center'}
+# Create the yt variable column
+dlmdata$pred_yt <- rep(0, times=nrow(dlmdata))
+for (n in 1:(nrow(dlmdata))){
+  dlmdata$pred_yt[n] = dlmdata$pred[n]*1.2
+}
+
+# Adding one step ahead predictions of y[t] w/ std errors (in green)
+gg_sim +
+  geom_line(data = dlmdata, 
+            aes(y = pred_yt,
+                x = time),
+            color = "seagreen",
+            size = 1.2) +
+  geom_ribbon(data = dlmdata,
+              aes(x = time, 
+                  ymin = pred_yt - 1.96 * sqrt((pSE**2)*(1.2**2)+(9)),
+                  ymax = pred_yt + 1.96 * sqrt((pSE**2)*(1.2**2)+(9))),
+              fill = "seagreen",
+              alpha = 0.2) +
+  labs(title = expression(
+    paste("One-Step-Ahead Predictions of ",
+          y[t],
+          " w/ Standard Errors"))) +
+  ylab("y[t]")
+
+# Predicted mean and variance of y at time=40
+a = dlmdata$pred[dlmdata$time == 40]
+R = dlmdata$pSE[dlmdata$time == 40]**2 
+a*1.2 # Mean aka ft
+((1.2**2)*R)+9 # Variance aka Qt
+```
+
+### Part C
+
+The plot is below. The numerical values are as follows: m~40~=0.3766 and C~40~=3.0484.
+
+```{r, fig.align = 'center'}
+# Store and plot the filtering distribution of theta
+dlmdata$filtered <- dropFirst(dlmdata_filtered$m)
+dlmdata$fSE <- dropFirst(sqrt(unlist(
+  dlmSvd2var(dlmdata_filtered$U.C, 
+             dlmdata_filtered$D.C))))
+
+gg_sim +
+  geom_line(data = dlmdata, 
+            aes(y = pred,
+                x = time),
+            color = "red",
+            size = .5) +
+  geom_line(data = dlmdata, 
+            aes(y = filtered,
+                x = time),
+            color = "blue",
+            size = 1.2) +
+  geom_ribbon(data = dlmdata,
+              aes(x = time, 
+                  ymin = filtered - 1.96 * fSE,
+                  ymax = filtered + 1.96 * fSE),
+              fill = "blue",
+              alpha = 0.2) +
+  labs(title = expression(
+    paste("Mean of the filtering distribution of ",
+          theta[t],
+          " w/ Standard Errors"))) +
+  ylab("theta[t]")
+
+
+# Predicted mean and variance of y at time=40
+dlmdata$filtered[dlmdata$time == 40] # Mean aka mt
+dlmdata$fSE[dlmdata$time == 40]**2 # Variance aka Ct
+```
+
+### Part D
+
+The recursive manual Kalman Filtering process is shown below.
+
+```{r}
+# Starting Tt|yt at time=22 and constants
+m=3.539
+C=3.048
+G=0.8
+F=1.2
+w=4
+v=9
+e=0 # Setting the forecast error to 0 since we don't have yts
+
+# Looping through Kalman Filter
+for (n in 1:6) {
+# Step 1 Kalman Filter (Tt|yt-1)
+a=G*m
+R=((G**2)*C)+w
+
+# Step 2 Kalman Filter (yt|yt-1)
+f=F*a
+Q=((F**2)*R)+v
+
+# Step 3 Kalman Filter (Tt|yt)
+m=a+(F*R*(1/Q)*e)
+C=R-((R**2)*(F**2)*(1/Q))
+}
+
+a
+R
+```
+
+### Part E
+
+The plot and values for $\theta$~t~ such that y~t~ is missing are show below. The missing values are repeated here for ease:
+
+* Time=11, $\theta$=1.950
+
+* Time=23, $\theta$=0.492
+
+* Time=24, $\theta$=-0.342
+
+* Time=25, $\theta$=-0.800
+
+* Time=26, $\theta$=-1.940
+
+* Time=27, $\theta$=-0.724
+
+* Time=64, $\theta$=1.960
+
+* Time=80, $\theta$=-2.24
+
+```{r, fig.align = 'center'}
+# Store and plot the smoothed predictions of theta and standard errors
+dlmdata_smoothed <- dlmSmooth(dlmdata_filtered)
+dlmdata$smoothed <- dropFirst(dlmdata_smoothed$s)
+dlmdata$sSE <- dropFirst(sqrt(unlist(
+  dlmSvd2var(dlmdata_smoothed$U.S, 
+             dlmdata_smoothed$D.S))))
+
+gg_sim +
+  geom_line(data = dlmdata, 
+            aes(y = pred,
+                x = time),
+            color = "red",
+            size = .5) +
+  geom_line(data = dlmdata, 
+            aes(y = filtered,
+                x = time),
+            color = "blue",
+            size = .5) +
+  geom_line(data = dlmdata, 
+            aes(y = smoothed,
+                x = time),
+            color = "darkgreen",
+            size = 1.2) +
+  geom_ribbon(data = dlmdata,
+              aes(x = time, 
+                  ymin = smoothed - 2 * sSE,
+                  ymax = smoothed + 2 * sSE),
+              fill = "green",
+              alpha = 0.2) +
+  labs(title = expression(
+    paste("Smoothed Values of ",
+          theta[t],
+          " w/ Standard Errors"))) +
+  ylab("theta[t]")
+
+# Creating a  vector to store the NA times 
+missing_times <- c()
+
+# Append t+1 polio counts to NA times
+for (n in dlmdata_missing$time){
+  missing_times <- append(missing_times, dlmdata_smoothed$s[n])}
+
+# Separating only missing NA times w/ smothed estimates
+dlmdata_missing$new_thetat <- missing_times
+dlmdata_missing
+```
+
+### Part F
+
+The plot is shown below. 
+
+Earlier in forecasting for future values of y, there is more certainty about what the value will be. As you go further out, i.e., at time 110 vs time 101, it is less certainty that the data will continue to follow the same trend, meaning that there is a lower predictive variance for y~101~ (17.5694) than y~110~ (24.8661).
+
+```{r, fig.align = 'center'}
+# DLM forecast function
+forecast_mod <- dlmForecast(dlmdata_filtered, nAhead = 10)
+
+# Exctracting standard deviation and appending mean/var to dlmdata
+dlmdata$ytstdev <- rep(0, times=nrow(dlmdata))
+
+for (n in 1:(nrow(forecast_mod$f))){
+  new_row <- c(forecast_mod$f[n], 100+n, forecast_mod$f[n], "","","","","","")
+  dlmdata <- rbind(dlmdata, new_row) 
+  dlmdata$ytstdev[dlmdata$time == 100+n] = as.numeric(forecast_mod$Q[n])
+}
+
+
+# Changing yt/ytstdev from chr to int
+dlmdata$yt <- as.integer(dlmdata$yt) 
+dlmdata$ytstdev <- as.integer(dlmdata$ytstdev)
+dlmdata$time <- as.integer(dlmdata$time)
+
+gg_sim <- ggplot(dlmdata, aes(x = time, y = yt)) +
+  geom_point(size = 1, color = "seagreen") +
+  geom_line(color = "darkseagreen3") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust=0.5)) +
+  labs(title = 'DLM Data Time Series') 
+
+gg_sim +
+  geom_ribbon(data = dlmdata,
+              aes(x = time, 
+                  ymin = yt - 1.96 * sqrt(ytstdev),
+                  ymax = yt + 1.96 * sqrt(ytstdev)),
+              fill = "seagreen",
+              alpha = 0.2) +
+  labs(title = expression(
+    paste("Original ", y[1:100]," Values with 10 Future Values"))) +
+  ylab("y")
+
+forecast_mod$Q[1] #Q101
+forecast_mod$Q[10] #Q110
+```

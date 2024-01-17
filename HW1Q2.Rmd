@@ -1,0 +1,93 @@
+---
+title: "Adv Predictive Models: Homework 1"
+output:
+  html_document:
+    df_print: paged
+date: '2023-01-19'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#Relevant Libraries
+library(ggplot2)
+library(mvtnorm)
+library(ggplot2)
+library(gridExtra)
+library(tidyverse)
+```
+
+### Part A
+
+```{r fig.width = 4, fig.height = 8, fig.align = 'center'}
+#Create a data.frame object, the easy structure to use for ggploting
+tennisCourt = data.frame(x1 = c(0,4.5,18,31.5,36,0,4.5,4.5,0,-2),
+                         x2 = c(0,4.5,18,31.5,36,36,31.5,31.5,36,38),
+                         y1 = c(-39,-39,-21,-39,-39,39,21,-21,-39,0), 
+                         y2 = c(39,39,21,39,39,39,21,-21,-39,0),
+                         width = c(rep(1,9),3))
+
+#Create a plot object called ggTennis
+ggTennis = ggplot(tennisCourt) + 
+  geom_segment(aes(x = x1,y = y1,xend = x2,yend = y2),size = tennisCourt$width) + 
+  labs(x = "Lateral",y = 'Depth', title = '5,000 Independent Realizations') + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust=0.5))
+
+#Create 5000 normally distributed points as a data frame
+N <- 5000
+v <- c(29, 16)
+C <- matrix(c(4, 4, 4, 16), nrow = 2)
+X1 <- rnorm(N, v[1], C[1,1])
+X2 <- rnorm(N, v[2], C[1,1])
+
+PointsToAdd <- data.frame(X1, X2)
+
+#Add the points to ggTennis
+ggTennisWithPoints = ggTennis +
+  geom_point(data = PointsToAdd,aes(x = X1, y = X2),color = 'darkseagreen')
+
+ggTennisWithPoints
+```
+
+### Part B
+
+```{r}
+#Theoretical Probability
+pmvnorm(lower=c(18, 0), upper=c(31.5, 21), mean=c(29, 16),
+        corr=NULL, sigma=matrix(c(4, 4, 4, 16), nrow = 2), algorithm = GenzBretz(), keepAttr=TRUE)
+
+#Approximate Model Probability, Step 1: Subset legal points
+Legal_PointsToAdd <- subset(PointsToAdd, X1>=18 & X1<=31.5 & X2>=0 & X2<=21)
+#Approximate Model Probability, Step 2: Divide by N=5000
+nrow(Legal_PointsToAdd)/5000
+```
+
+### Part C
+
+```{r}
+#Find the area under the curve that is greater than 0 and less than 21
+pnorm(21, 17.5, sqrt(12))-pnorm(0, 17.5, sqrt(12))
+```
+
+### Part D
+
+```{r fig.width = 4, fig.height = 8, fig.align = 'center'}
+#Create 500 normally distributed points as a data frame
+N <- 500
+X1=30.5
+X2 <- rnorm(N, 17.5, 12)
+Cond_PointsToAdd <- data.frame(X1, X2)
+
+#Creating a jitter variable
+jitter <- position_jitter(width = 1.5)
+
+#Add the points to ggTennis and previous 5000 points
+ggTennisWithPoints_All = ggTennis +
+  geom_point(data = PointsToAdd,aes(x = X1, y = X2),color = 'darkseagreen') +
+  geom_point(position = jitter, data = Cond_PointsToAdd,aes(x = X1, y = X2),color = 'darkolivegreen') +
+  labs(x = "Lateral",y = 'Depth', title = '500 Conditional X2 Realizations\nwith 5,000 Independent Realizations')
+
+ggTennisWithPoints_All
+```
+
+

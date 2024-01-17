@@ -1,0 +1,93 @@
+---
+title: "HW4Q1"
+output: html_document
+date: '2023-02-19'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Load libraries
+library(spatstat)
+library(ggplot2)
+library(gridExtra)
+library(tidyverse)
+library(xts)
+library(dlm)
+library(spatstat)
+library(ggmap)
+```
+
+### Part A
+
+```{r, fig.align = 'center'}
+# Load data and reformat
+data <- read.csv("~/MSDS/predictive models/publicschools.csv")
+codata <- data[data$STATE=="CO",]
+colnames(codata)[colnames(codata) == "ï..X"] ="X"
+
+# Visualizing the data w/ qmplot and ggplot
+qmplot(x = X, y = Y, data = codata, main= "Locations of Public Schools in Colorado")
+
+
+# Formatting into ppp object
+a = max(codata$X)
+b = min(codata$X)
+c = max(codata$Y)
+d = min(codata$Y)
+plot.new() # Have to include to avoid plot.new error
+box = polygon(x = c(b, a, a, b), y = c(d, d, c, c), lty = 2)
+win = owin(xrange=c(b,a), yrange=c(d,c), poly=box, mask=NULL, unitname=NULL, xy=NULL)
+codata_ppp <- ppp(codata$X, codata$Y, window = win, check=TRUE, drop=TRUE)
+
+# Visualizing the data as a ppp object
+plot(codata_ppp, main="Locations of Public Schools in Colorado")
+```
+
+The following data shows location of US Public Schools in Colorado, specifically all public elementary and secondary education facilities in the United States defined by the Common Core of Data (https://nces.ed.gov/ccd/). The full dataset includes information across the United States, but it has been condennsed to just the state of Colorado for ease of analysis. Within the region of Colorado, there are 1872 observations of 25 variables. The only variables that we use are:
+
+* X: Longitude coordinates
+
+* Y: Latitude coordinates
+
+* State: States within the US, restricted all to "CO" in this case.
+
+For more information on this dataset, visit the Kaggle source here: https://www.kaggle.com/datasets/carlosaguayo/usa-public-schools. 
+
+The data seems to cover most parts of the region, with apparent high intensity points in the middle region, likely concentrated around larger cities with high populations. The two plots above show the data plotted over a state map and in a ppp object format.
+
+### Part B
+
+The data is a SPP because it plots random variables, in this case Colorado public schools, that represent locations of events in space, in this case the politically defined state of Colorado. Note that the aspect of "randomness" is the location itself. A SPP is a stochastic process, which is essentially a probabilistic model. This data can be thought of as a probabilistic model because we are investigating the probability of Colorado public schools being located where they are.
+
+### Part C
+
+```{r, fig.align = 'center'}
+# Observed counts in each quadrant
+Q <- quadratcount(codata_ppp, 
+             nx = 6, #number of quadrants along x axis
+             ny = 3) #number of quadrants along y
+Q
+
+# Superimposed quadrants and observed counts on graph
+plot(codata_ppp, 
+     cex = 0.5, 
+     pch = "+", 
+     main="Locations of Public Schools in Colorado")
+plot(Q, 
+     add = TRUE, 
+     cex = 2) 
+
+# Chi-squire test
+quadrat.test(codata_ppp, nx = 6, ny = 3)  
+```
+
+Given the above plots in Part A and Part C, it is unlikely that a homogeneous Poisson process is appropriate for this data. There are clearly regions in the center of the state where the intensity is greater. Using row and column indices, quadrat boxes (4,1) and (4,2) with counts of 794 and 495, respectively, are much greater than other quadrat boxes.
+
+Beyond just visual commentary, we can perform a Chi-square test to compare the expected number of counts in each quadrat box to the actual number of counts. From this test, we see the following data points:
+
+* Chi-square test stat: 6814.7 
+
+* P-value: < 2.2 x 10^-16^
+
+Given the very small p value, we can reject null hypothesis that data come from homogeneous Poisson process. Note that these data points depend on how many quadrats you have, but adjusting quadrats in most cases yields very similar results.

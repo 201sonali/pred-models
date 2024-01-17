@@ -1,0 +1,60 @@
+---
+title: "HW4Q2"
+output: html_document
+date: '2023-02-17'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list=ls())
+library(ggplot2)
+library(gridExtra)
+library(tidyverse)
+library(readxl)
+library(xts)
+library(dlm)
+library(spatstat)
+library(ggmap)
+```
+
+```{r}
+data <- read_excel("~/MSDS/predictive models/Chi_Data.xlsx")
+load("C:/Users/Sonali Singh/Documents/MSDS/predictive models/asset-v1_UTAustinX+DataSci.312+1T2023+type@asset+block@chi_supermarkets_ppp.Rdata")
+```
+
+### Part A
+
+There are no supermarkets in the top right corner because the map is zoomed out to account for all points. This means that the top right corner is just water, with no land are for supermarkets.
+
+```{r, fig.align = 'center'}
+qmplot(x = lon, y = lat, data = data, main= "Chicago Market Locations")
+```
+
+### Part B
+
+One feature of the ppp object is some instances of clustering along the upper right hand side. Given that we know there is water on this upper right hand side, this might be indicative of the influential effect of the covariate of proximity to water (i.e., coastal or inland).
+
+Another feature of the ppp object is that, aside from the coast, there seems to be a random but equal spread of points, potential representing complete spatial randomness (CSR). Note that this does not mean that the points are equally spread-- this would be more abnormal than CSR and might be indicative of repulsive tendency.
+
+```{r, fig.align = 'center'}
+# PART B
+plot(markets_ppp, main="Chicago Market Locations")
+```
+
+### Part C
+
+The intercept of the estimated log intensity function is -3.140 x 10^4^.
+
+The numerical value of the intensity function at the point (x = 443674, y = 4636999) is 7.706 x 10^-7^.
+
+```{r, fig.align = 'center'}
+fit1 <- ppm(markets_ppp, ~ polynom(x, y, 2)) #2nd degree poly function
+summary(fit1)
+plot(fit1, 
+     how = "image", 
+     se = FALSE, 
+     col = grey(seq(1,0,length=128)))
+
+predict(fit1, location=data.frame(x=443674, y=4636999))
+```
